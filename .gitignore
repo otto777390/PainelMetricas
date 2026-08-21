@@ -1,0 +1,11 @@
+# Configuração local do editor (contém caminhos da sua máquina)
+.claude/
+
+# Backups locais
+backup/
+*.bak
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store

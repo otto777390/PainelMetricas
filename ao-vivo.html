@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendas de hoje ao vivo - Mercado Livre</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="acesso.js"></script>
+    <script>PainelAcesso.exigirLogin();</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="motor-painel.js"></script>
+    <script src="catalogo.js"></script>
+    <script src="dados.js"></script>
+    <script src="loja.js"></script>
+
+    <style>
+        :root {
+            --ml-yellow: #ffe600;
+            --ml-bg: #f0f0f0;
+            --ml-white: #ffffff;
+            --ml-text: #333333;
+            --ml-blue: #3483fa;
+            --ml-border: #e6e6e6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; }
+        body { background-color: var(--ml-bg); color: var(--ml-text); }
+
+        /* HEADER (igual ao das Métricas) */
+        header { background-color: var(--ml-yellow); height: 48px; padding: 0; position: fixed; top: 0; width: 100%; z-index: 100; }
+        .hd-inner { width: 100%; max-width: 1200px; height: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .hd-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+        .hd-logo { display: flex; align-items: center; flex-shrink: 0; }
+        .hd-logo img { height: 33px; width: auto; display: block; }
+        .hd-brand-text { font-size: 17px; font-weight: 600; color: #333; white-space: nowrap; }
+        .hd-search { flex: 0 0 386px; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; background: rgba(0,0,0,.07); border-radius: 16px; }
+        .hd-search input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: #333; }
+        .hd-search input::placeholder { color: #666; }
+        .hd-search svg { color: #666; flex-shrink: 0; }
+        .hd-actions { display: flex; align-items: center; gap: 26px; font-size: 14px; color: #333; flex-shrink: 0; }
+        .hd-actions > * { display: flex; align-items: center; cursor: pointer; white-space: nowrap; }
+        .hd-user { gap: 6px; }
+        .hd-avatar { width: 20px; height: 20px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; color: #333; overflow: hidden; flex-shrink: 0; font-size: 9px; font-weight: 600; letter-spacing: .2px; }
+        .hd-nome { cursor: text; padding: 2px 5px; margin: -2px -5px; border-radius: 4px; outline: none; min-width: 22px; transition: background-color .15s; }
+        .hd-nome:hover { background: rgba(0,0,0,.06); }
+        .hd-nome:focus { background: rgba(255,255,255,.75); cursor: text; }
+        .hd-sep { width: 1px; height: 20px; background: rgba(0,0,0,.18); cursor: default; }
+        .hd-bell { position: relative; }
+        .hd-bell .badge { position: absolute; top: -6px; right: -7px; background: #f23d4f; color: #fff; font-size: 10px; font-weight: 600; border-radius: 50%; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
+        .hd-monitor { gap: 6px; }
+        .hd-sair { gap: 6px; }
+
+        .subheader { position: fixed; top: 48px; left: 0; width: 100%; height: 32px; background: #fff; z-index: 99; }
+        .sub-inner { width: 100%; max-width: 1200px; height: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .sub-left { display: flex; align-items: center; gap: 22px; }
+        .sub-item { font-size: 13px; color: #333; cursor: pointer; }
+        .sub-item.active { font-weight: 600; }
+        .sub-sep { width: 1px; height: 18px; background: #d9d9d9; }
+        .sub-edit { display: flex; align-items: center; color: #3483fa; cursor: pointer; }
+        .sub-right { font-size: 13px; color: #333; text-decoration: none; cursor: pointer; }
+        .sub-right span { color: inherit; }
+
+        /* FAIXA AMARELA COM A ONDA */
+        .hero { margin-top: 80px; position: relative; background: var(--ml-yellow); padding: 30px 0 10px; overflow: hidden; }
+        .hero-wave { position: absolute; left: 0; bottom: 0; width: 100%; height: 82px; display: block; }
+        .hero-inner { position: relative; z-index: 2; text-align: center; }
+        .hero h1 { font-size: 32px; font-weight: 700; color: #2b2b2b; letter-spacing: -.2px; }
+        .hero-clock { display: inline-flex; align-items: center; gap: 9px; margin-top: 22px; background: rgba(250,250,250,.82); border-radius: 18px; padding: 7px 16px; font-size: 13px; color: #333; }
+        .hero-dot { width: 8px; height: 8px; border-radius: 50%; background: #f23d4f; position: relative; animation: pulsaPonto 1.8s ease-in-out infinite; }
+        .hero-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #f23d4f; animation: pulsaHalo 1.8s ease-out infinite; }
+        @keyframes pulsaPonto { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+        @keyframes pulsaHalo { 0% { transform: scale(1); opacity: .45; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .hero-dot, .hero-dot::after { animation: none; } .hero-dot::after { display: none; } }
+
+        .hero-card { position: relative; z-index: 2; width: 595px; height: 117px; margin: -9px auto 0; background: #fff; border-radius: 20px; box-shadow: 0 2px 12px rgba(0,0,0,.08); display: flex; align-items: center; justify-content: center; }
+        .hero-card .valor { font-size: 52px; font-weight: 700; color: #2b2b2b; letter-spacing: 1px; }
+
+        .hero-faixa { position: absolute; left: 0; right: 0; top: 0; bottom: 0; max-width: 1420px; margin: 0 auto; z-index: 3; pointer-events: none; }
+        .btn-tela-cheia { position: absolute; right: 40px; bottom: 46px; pointer-events: auto; width: 48px; height: 48px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #333; font-size: 16px; transition: .2s; }
+        .btn-tela-cheia:hover { box-shadow: 0 3px 12px rgba(0,0,0,.2); }
+
+        /* CARDS */
+        .painel { max-width: 1420px; margin: 0 auto; padding: 32px 20px 60px; display: grid; grid-template-columns: 340px 1fr 342px; gap: 26px; align-items: start; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; }
+        .card-title { text-align: center; font-size: 17px; font-weight: 500; color: #333; padding: 22px 16px; border-bottom: 1px solid #ededed; }
+
+        .metricas-grid { display: grid; grid-template-columns: 1fr 1fr; }
+        .metrica { padding: 22px 10px 26px; text-align: center; border-right: 1px solid #ededed; border-bottom: 1px solid #ededed; }
+        .metrica:nth-child(2n) { border-right: none; }
+        .metrica:nth-child(n+5) { border-bottom: none; }
+        .metrica-icone { width: 34px; height: 34px; margin: 0 auto 12px; border-radius: 50%; background: #e3edfd; color: var(--ml-blue); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+        .metrica-label { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .metrica-valor { font-size: 22px; font-weight: 500; color: #333; }
+
+        .grafico-topo { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px 0; }
+        .grafico-eixo-label { font-size: 12px; color: #666; }
+        .grafico-legenda { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #666; }
+        .legenda-item { display: flex; align-items: center; gap: 6px; }
+        .legenda-marca { width: 8px; height: 8px; border-radius: 50%; }
+        .legenda-marca.ontem { border-radius: 1px; }
+        .grafico-cal { color: var(--ml-blue); cursor: pointer; font-size: 13px; background: #e8f0fe; border-radius: 6px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+        .grafico-box { padding: 8px 22px 14px; height: 330px; position: relative; }
+
+        /* Balão do gráfico (desenhado em HTML, não no canvas) */
+        .tt-caixa { position: absolute; pointer-events: none; z-index: 5; background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.10); padding: 10px 13px 11px; min-width: 148px; opacity: 0; }
+        .tt-titulo { font-size: 11.5px; color: #999; margin-bottom: 8px; }
+        .tt-linha { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #333; margin-top: 5px; }
+        .tt-marca { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .tt-marca.quadrada { border-radius: 2px; }
+        .tt-valor { margin-left: auto; font-weight: 500; white-space: nowrap; padding-left: 18px; }
+        .grafico-x-label { text-align: center; font-size: 12px; color: #666; padding-bottom: 18px; }
+
+        .vazio { padding: 60px 30px 70px; text-align: center; }
+        .vazio-icone { width: 84px; height: 84px; margin: 0 auto 26px; border-radius: 50%; background: #eef4fd; color: #9aa8bd; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+        .vazio-texto { font-size: 15px; font-weight: 500; color: #333; line-height: 1.5; }
+
+        .produto { display: flex; align-items: center; gap: 11px; padding: 15px 16px; border-bottom: 1px solid #f0f0f0; }
+        .produto:last-child { border-bottom: none; }
+        .produto.destaque { background: #fdf9e3; }
+        .produto-pos { width: 12px; flex-shrink: 0; font-size: 13px; color: #999; text-align: center; }
+        .produto-foto { width: 46px; height: 46px; flex-shrink: 0; border-radius: 4px; background: #f4f4f4; display: flex; align-items: center; justify-content: center; color: #b5b5b5; font-size: 18px; overflow: hidden; }
+        .produto-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .produto-info { min-width: 0; flex: 1; }
+        .produto-nome { font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+        .produto-linha { font-size: 12px; color: #666; line-height: 1.55; }
+        .produto-exp { font-size: 12px; color: #999; line-height: 1.55; }
+        .produto-exp b { color: #00a650; font-weight: 400; }
+
+        /* RODAPÉ */
+        footer { background: #ededed; padding: 26px 20px; }
+        .rodape-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 26px; font-size: 13px; color: #666; }
+        .rodape-links a { color: #666; text-decoration: none; display: flex; align-items: center; gap: 7px; }
+        .rodape-links a:hover { color: #333; }
+
+        .fab { position: fixed; right: 30px; bottom: 30px; width: 52px; height: 52px; border-radius: 50%; background: var(--ml-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 3px 10px rgba(0,0,0,.2); cursor: pointer; transition: .2s; z-index: 90; }
+        .fab:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <header>
+      <div class="hd-inner">
+        <div class="hd-brand">
+            <span class="hd-logo">
+                <a href="index.html"><img src="https://http2.mlstatic.com/frontend-assets/seller-web-navigation/ui-navigation/1.22.0/mercadolibre/sellers_logo.svg" alt="Mercado Livre - Central de vendedores"></a>
+            </span>
+            <span class="hd-brand-text">Central de vendedores</span>
+        </div>
+
+        <div class="hd-search">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></svg>
+            <input type="text" placeholder="Buscar seus produtos ou vendas por título, SKU ou #">
+        </div>
+
+        <div class="hd-actions">
+            <div class="hd-user">
+                <span class="hd-avatar" id="loja-avatar">PO</span>
+                <span class="hd-nome" id="loja-nome" contenteditable="plaintext-only" spellcheck="false" title="Clique para editar o nome da loja">POOL</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <span class="hd-sep"></span>
+            <span>Anunciar</span>
+            <div class="hd-bell">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5z"/><path d="M13.7 19a2 2 0 0 1-3.4 0"/></svg>
+                <span class="badge">1</span>
+            </div>
+            <div class="hd-help">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.5"/><path d="M12 16.8h.01"/></svg>
+            </div>
+            <div class="hd-monitor">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="1.6"/><path d="M9 20.5h6M12 17v3.5"/><path d="M7 13.5v-2M11 13.5v-5M15 13.5v-3.5"/></svg>
+                <span>Monitor ao vivo</span>
+            </div>
+            <div class="hd-sair" id="btn-sair" title="Sair do painel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5.5A1.5 1.5 0 0 1 4 19.5v-15A1.5 1.5 0 0 1 5.5 3H9"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+                <span>Sair</span>
+            </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="subheader">
+      <div class="sub-inner">
+        <div class="sub-left">
+            <a class="sub-item active" href="index.html" style="text-decoration: none; color: inherit;">Métricas</a>
+            <span class="sub-item">Resumo</span>
+            <span class="sub-item">Vendas</span>
+            <span class="sub-sep"></span>
+            <span class="sub-edit">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 20 1.2-4.2L15.6 5.4a1.8 1.8 0 0 1 2.6 0l1.4 1.4a1.8 1.8 0 0 1 0 2.6L9.2 19.8z"/><path d="m14.6 6.4 3 3"/></svg>
+            </span>
+        </div>
+        <a class="sub-right">Ir para comprar no Mercado <span>Livre</span></a>
+      </div>
+    </div>
+
+    <section class="hero">
+        <svg class="hero-wave" viewBox="0 0 1440 90" preserveAspectRatio="none">
+            <path fill="#f7dc00" d="M0 46c180-34 360-34 540-6s360 40 540 6 300-34 360-26v70H0z"/>
+        </svg>
+
+        <div class="hero-inner">
+            <h1>Vendas de hoje ao vivo</h1>
+            <div class="hero-clock">
+                <span class="hero-dot"></span>
+                <span id="relogio">—</span>
+            </div>
+        </div>
+
+        <div class="hero-card">
+            <div class="valor" id="valor-hoje">R$ 0,00</div>
+        </div>
+
+        <div class="hero-faixa">
+            <button class="btn-tela-cheia" id="btn-tela-cheia" aria-label="Tela cheia">
+                <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+            </button>
+        </div>
+    </section>
+
+    <div class="painel">
+        <div class="card">
+            <div class="card-title">Métricas-chave</div>
+            <div class="metricas-grid">
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-regular fa-user"></i></div>
+                    <div class="metrica-label">Visitas únicas</div>
+                    <div class="metrica-valor" id="m-visitas">0</div>
+                </div>
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-solid fa-user-group"></i></div>
+                    <div class="metrica-label">Total de compradores</div>
+                    <div class="metrica-valor" id="m-compradores">0</div>
+                </div>
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-solid fa-cart-shopping"></i></div>
+                    <div class="metrica-label">Quantidade de vendas</div>
+                    <div class="metrica-valor" id="m-vendas">0</div>
+                </div>
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-solid fa-arrows-rotate"></i></div>
+                    <div class="metrica-label">Conversão</div>
+                    <div class="metrica-valor" id="m-conversao">0%</div>
+                </div>
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-solid fa-tag"></i></div>
+                    <div class="metrica-label">Unidades vendidas</div>
+                    <div class="metrica-valor" id="m-unidades">0 u.</div>
+                </div>
+                <div class="metrica">
+                    <div class="metrica-icone"><i class="fa-solid fa-dollar-sign"></i></div>
+                    <div class="metrica-label">Preço médio</div>
+                    <div class="metrica-valor" id="m-preco">R$ 0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Tendências em vendas brutas</div>
+            <div class="grafico-topo">
+                <span class="grafico-eixo-label">Vendas (R$)</span>
+                <div class="grafico-legenda">
+                    <span class="legenda-item"><span class="legenda-marca" style="background:#3483fa"></span> Hoje</span>
+                    <span class="legenda-item"><span class="legenda-marca ontem" style="background:#f24a8f"></span> Ontem</span>
+                    <span class="grafico-cal"><i class="fa-regular fa-calendar"></i></span>
+                </div>
+            </div>
+            <div class="grafico-box"><canvas id="graficoAoVivo"></canvas></div>
+            <div class="grafico-x-label">Horas</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Produtos mais vendidos</div>
+            <div id="produtos-conteudo">
+                <div class="vazio">
+                    <div class="vazio-icone"><i class="fa-solid fa-cart-shopping"></i></div>
+                    <div class="vazio-texto">Você não vendeu nenhum produto hoje</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="rodape-links">
+            <a href="#">Trabalhe conosco</a>
+            <a href="#">Termos e condições</a>
+            <a href="#">Promoções</a>
+            <a href="#">Como cuidamos da sua privacidade</a>
+            <a href="#"><i class="fa-solid fa-universal-access"></i> Acessibilidade</a>
+            <a href="#">Ajuda</a>
+            <a href="#">Informações sobre seguros</a>
+            <a href="#">Programa de Afiliados</a>
+        </div>
+    </footer>
+
+    <div class="fab"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+
+    <script>
+        function moeda(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function moedaCurta(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+        function num(v) { return v.toLocaleString('pt-BR'); }
+        function doisDig(n) { return n.toString().padStart(2, '0'); }
+
+
+        let horaAtualGrafico = 23;
+        let mouseNoGrafico = false;
+
+        /* Balão do gráfico: caixa branca com "Vendas brutas" no topo e uma linha
+           por série, com o valor alinhado à direita. */
+        function balaoDoGrafico(contexto) {
+            const grafico = contexto.chart;
+            const balao = contexto.tooltip;
+            const pai = grafico.canvas.parentNode;
+
+            let caixa = pai.querySelector('.tt-caixa');
+            if (!caixa) {
+                caixa = document.createElement('div');
+                caixa.className = 'tt-caixa';
+                pai.appendChild(caixa);
+            }
+
+            if (balao.opacity === 0) {
+                caixa.style.opacity = '0';
+                return;
+            }
+
+            const indice = balao.dataPoints && balao.dataPoints.length ? balao.dataPoints[0].dataIndex : 0;
+            const linhas = grafico.data.datasets.map(function (serie, i) {
+                const valor = serie.data[indice];
+                const cor = serie.borderColor;
+                const forma = i === 0 ? 'tt-marca' : 'tt-marca quadrada';
+                return '<div class="tt-linha">'
+                     + '<span class="' + forma + '" style="background:' + cor + '"></span>'
+                     + '<span class="tt-rotulo">' + serie.label + '</span>'
+                     + '<span class="tt-valor">' + moedaCurta(valor || 0) + '</span>'
+                     + '</div>';
+            }).join('');
+
+            caixa.innerHTML = '<div class="tt-titulo">Vendas brutas</div>' + linhas;
+
+            /* Segura o balão dentro do card, para não vazar nas bordas. */
+            const largura = caixa.offsetWidth;
+            const limite = grafico.canvas.offsetWidth;
+            let x = grafico.canvas.offsetLeft + balao.caretX - largura / 2;
+            x = Math.max(grafico.canvas.offsetLeft, Math.min(x, grafico.canvas.offsetLeft + limite - largura));
+
+            caixa.style.opacity = '1';
+            caixa.style.left = x + 'px';
+            caixa.style.top = (grafico.canvas.offsetTop + balao.caretY - caixa.offsetHeight - 14) + 'px';
+        }
+
+        const rotulos = [];
+        for (let h = 0; h <= 23; h++) rotulos.push(doisDig(h));
+
+        const grafico = new Chart(document.getElementById('graficoAoVivo').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: rotulos,
+                datasets: [
+                    {
+                        label: 'Hoje', data: [], borderColor: '#3483fa', borderWidth: 2.5, fill: false,
+                        tension: .45, cubicInterpolationMode: 'default', spanGaps: false,
+                        pointRadius: ctx => ctx.dataIndex === horaAtualGrafico ? 5 : 0,
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#3483fa',
+                        pointHoverBorderWidth: 2.5,
+                        pointBackgroundColor: '#3483fa',
+                        pointBorderColor: 'rgba(52,131,250,.28)',
+                        pointBorderWidth: 5,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Ontem', data: vendasPorHora(registroOntem), borderColor: '#f24a8f',
+                        borderWidth: 2.5, fill: false, tension: .45, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: '#fff', pointHoverBorderColor: '#f24a8f', pointHoverBorderWidth: 2.5
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                /* Passar o mouse em qualquer ponto da coluna mostra hoje e ontem daquela hora. */
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    /* Balão em HTML: o do Chart.js é desenhado no canvas e não
+                       alinha o valor à direita do rótulo. */
+                    tooltip: { enabled: false, external: balaoDoGrafico }
+                },
+                scales: {
+                    y: { beginAtZero: true, border: { display: false }, grid: { color: '#f0f0f0', borderDash: [2, 4] }, ticks: { color: '#999', font: { size: 11 }, callback: v => v.toLocaleString('pt-BR') } },
+                    x: { border: { display: false }, grid: { display: false }, ticks: { color: '#999', font: { size: 11 }, maxRotation: 0, autoSkip: false, callback: (v, i) => i % 2 === 0 ? rotulos[i] : '' } }
+                }
+            }
+        });
+
+        /* Mais vendidos: apurado dos pedidos que já caíram hoje. Mesmo catálogo,
+           mesmas fotos e mesmos preços que a Vendra usa — os dois lados leem o
+           mesmo motor, então o ranking bate nas duas telas. */
+        function renderProdutos() {
+            const alvo = document.getElementById('produtos-conteudo');
+            const caidos = (registroHoje.pedidos || []).slice(0, registroHoje.qtdVendas);
+
+            if (!caidos.length) {
+                alvo.innerHTML = '<div class="vazio"><div class="vazio-icone"><i class="fa-solid fa-cart-shopping"></i></div><div class="vazio-texto">Você não vendeu nenhum produto hoje</div></div>';
+                return;
+            }
+
+            const porProduto = new Map();
+            caidos.forEach(p => {
+                const atual = porProduto.get(p.produtoId) || {
+                    titulo: p.titulo, imagem: p.imagem, estoque: p.estoque, valor: 0, unidades: 0
+                };
+                atual.valor += p.valor;
+                atual.unidades += p.quantidade;
+                porProduto.set(p.produtoId, atual);
+            });
+
+            const ranking = Array.from(porProduto.values())
+                .sort((a, b) => b.valor - a.valor)
+                .slice(0, 5);
+
+            alvo.innerHTML = ranking.map((p, i) => {
+                const foto = p.imagem ? `<img src="${p.imagem}" alt="">` : '<i class="fa-solid fa-box-open"></i>';
+                return `<div class="produto${i === 0 ? ' destaque' : ''}">
+                    <div class="produto-pos">${i + 1}</div>
+                    <div class="produto-foto">${foto}</div>
+                    <div class="produto-info">
+                        <div class="produto-nome">${p.titulo}</div>
+                        <div class="produto-linha">Vendas do dia: ${moedaCurta(p.valor)}</div>
+                        <div class="produto-linha">Estoque: ${p.estoque - p.unidades} unidades</div>
+                        <div class="produto-exp">Experiência de compra: <b>100 · Boa</b></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function atualizar() {
+            const agora = new Date();
+            if (stripTime(agora).getTime() !== stripTime(hoje).getTime()) { location.reload(); return; }
+
+            aplicarProgressoHoje(agora);
+
+            document.getElementById('relogio').textContent =
+                `${agora.getDate()} de ${mesesLong[agora.getMonth()].toLowerCase()}, ${doisDig(agora.getHours())}:${doisDig(agora.getMinutes())}:${doisDig(agora.getSeconds())}`;
+
+            const fat = registroHoje.faturamento, un = registroHoje.unidades;
+            const vis = registroHoje.visitas, ven = registroHoje.qtdVendas;
+            const conv = vis > 0 ? (ven / vis) * 100 : 0;
+            const pMedio = un > 0 ? fat / un : 0;
+
+            document.getElementById('valor-hoje').textContent = moeda(fat);
+            document.getElementById('m-visitas').textContent = num(vis);
+            document.getElementById('m-compradores').textContent = num(ven);
+            document.getElementById('m-vendas').textContent = num(ven);
+            document.getElementById('m-conversao').textContent = conv.toFixed(2).replace('.', ',') + '%';
+            document.getElementById('m-unidades').textContent = num(un) + ' u.';
+            document.getElementById('m-preco').textContent = moedaCurta(pMedio);
+
+            horaAtualGrafico = agora.getHours();
+            grafico.data.datasets[0].data = vendasPorHora(registroHoje, agora.getHours() * 3600 + agora.getMinutes() * 60 + agora.getSeconds());
+            /* Redesenhar o gráfico apaga o balão. Enquanto o mouse estiver em
+               cima, só os dados são trocados; o desenho espera o cursor sair. */
+            if (!mouseNoGrafico) grafico.update('none');
+
+            renderProdutos();
+        }
+
+        /* Enquanto o cursor estiver sobre o gráfico, o redesenho automático pausa. */
+        const telaGrafico = document.getElementById('graficoAoVivo');
+        telaGrafico.addEventListener('mouseenter', function () { mouseNoGrafico = true; });
+        telaGrafico.addEventListener('mouseleave', function () { mouseNoGrafico = false; grafico.update('none'); });
+
+        atualizar();
+        setInterval(atualizar, 1000);
+
+        document.getElementById('btn-tela-cheia').addEventListener('click', () => {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else document.documentElement.requestFullscreen();
+        });
+
+        /* Sair do painel */
+        const botaoSair = document.getElementById('btn-sair');
+        if (botaoSair) botaoSair.addEventListener('click', function () { PainelAcesso.sair(); });
+
+    </script>
+</body>
+</html>
