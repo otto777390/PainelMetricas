@@ -553,6 +553,91 @@
 
         let selInicio = null, selFim = null;
 
+        /* ------------------------------------------------- comparação real
+           O seletor diz "Comparar com: período anterior", então é isso que as
+           setinhas mostram: o mesmo intervalo, deslocado para trás. */
+
+        /** Totais de um dia até determinado segundo (para comparar hoje com
+         *  ontem na mesma hora, em vez de hoje parcial contra ontem inteiro). */
+        function totaisDoDiaAte(dia, ateSegundo) {
+            let fat = 0, uni = 0, ven = 0, can = 0;
+            const pedidos = dia.pedidos || [];
+            for (let i = 0; i < pedidos.length; i++) {
+                const p = pedidos[i];
+                if (p.segundo > ateSegundo) break;
+                ven++;
+                if (p.status === 'CANCELLED') { can++; continue; }
+                fat += p.valor; uni += p.unidades;
+            }
+            const marco = new Date(2000, 0, 1, Math.floor(ateSegundo / 3600), Math.floor((ateSegundo % 3600) / 60));
+            return { fat: fat, uni: uni, ven: ven, can: can, vis: Math.floor(dia.visCheio * fracaoDoDia(marco)) };
+        }
+
+        /** Soma um intervalo de dias. `cortarUltimoEm` trunca o último dia. */
+        function somarPeriodo(inicio, fim, cortarUltimoEm) {
+            const t = { fat: 0, uni: 0, vis: 0, ven: 0, can: 0 };
+            const di = stripTime(inicio).getTime(), df = stripTime(fim).getTime();
+
+            historicoVendas.forEach(function (dia) {
+                const k = stripTime(dia.dataObj).getTime();
+                if (k < di || k > df) return;
+
+                if (k === df && typeof cortarUltimoEm === 'number') {
+                    const p = totaisDoDiaAte(dia, cortarUltimoEm);
+                    t.fat += p.fat; t.uni += p.uni; t.vis += p.vis; t.ven += p.ven; t.can += p.can;
+                } else {
+                    t.fat += dia.fatCheio; t.uni += dia.uniCheio; t.vis += dia.visCheio;
+                    t.ven += dia.venCheio; t.can += dia.canCheio;
+                }
+            });
+            return t;
+        }
+
+        /** Período imediatamente anterior, do mesmo tamanho. */
+        function periodoAnterior(dataInicio, dataFim, ehHoje) {
+            const agora = new Date();
+            const corte = agora.getHours() * 3600 + agora.getMinutes() * 60 + agora.getSeconds();
+
+            if (ehHoje) {
+                const ontem = new Date(stripTime(hoje).getTime() - 86400000);
+                return somarPeriodo(ontem, ontem, corte);
+            }
+
+            const dias = Math.round((stripTime(dataFim) - stripTime(dataInicio)) / 86400000) + 1;
+            const fim = new Date(stripTime(dataInicio).getTime() - 86400000);
+            const inicio = new Date(fim.getTime() - (dias - 1) * 86400000);
+            return somarPeriodo(inicio, fim);
+        }
+
+        /** Setinha com a variação percentual. `inverter` para métricas em que
+         *  subir é ruim, como vendas canceladas. */
+        function variacao(atual, anterior, inverter) {
+            const dica = 'Período anterior: ' + (Number.isInteger(anterior) ? formatNum(anterior) : formatMoney(anterior));
+
+            if (!anterior) {
+                if (!atual) return '<span class="metric-trend">—</span>';
+                return '<span class="metric-trend ' + (inverter ? 'trend-down' : 'trend-up') + '" title="Sem registro no período anterior">novo</span>';
+            }
+
+            const pct = ((atual - anterior) / anterior) * 100;
+            if (Math.abs(pct) < 0.5) return '<span class="metric-trend" title="' + dica + '">0%</span>';
+
+            const subiu = pct > 0;
+            const bom = inverter ? !subiu : subiu;
+            return '<span class="metric-trend ' + (bom ? 'trend-up' : 'trend-down') + '" title="' + dica + '">'
+                 + '<i class="fa-solid fa-caret-' + (subiu ? 'up' : 'down') + '"></i> '
+                 + Math.abs(pct).toFixed(0) + '%</span>';
+        }
+
+        /** Conversão varia em pontos percentuais, não em %. */
+        function variacaoPontos(atual, anterior) {
+            const dif = atual - anterior;
+            const dica = 'Período anterior: ' + anterior.toFixed(2).replace('.', ',') + '%';
+            if (Math.abs(dif) < 0.05) return '<span class="metric-trend" style="font-size: 12px;" title="' + dica + '">— pts</span>';
+            return '<span class="metric-trend ' + (dif > 0 ? 'trend-up' : 'trend-down') + '" style="font-size: 12px;" title="' + dica + '">'
+                 + (dif > 0 ? '+' : '−') + Math.abs(dif).toFixed(1).replace('.', ',') + ' pts</span>';
+        }
+
         function atualizarDashboard(dataInicio, dataFim) {
             selInicio = dataInicio; selFim = dataFim;
             let isHoje =(stripTime(dataInicio).getTime() === stripTime(dataFim).getTime() && stripTime(dataInicio).getTime() === stripTime(hoje).getTime());
@@ -583,14 +668,21 @@
             const pVenda = tVen > 0 ? (tFat / tVen) : 0;
             const conv = tVis > 0 ? ((tVen / tVis) * 100) : 0;
 
-            document.getElementById('val-vendas').innerHTML = `${formatMoney(tFat)} <span class="metric-trend trend-up"><i class="fa-solid fa-caret-up"></i> ${pctFixo(tFat, 3, 4)}%</span>`;
-            document.getElementById('val-unidades').innerHTML = `${formatNum(tUni)} <span class="metric-trend trend-up"><i class="fa-solid fa-caret-up"></i> ${pctFixo(tUni, 1, 4)}%</span>`;
-            document.getElementById('val-preco-unidade').innerHTML = `${formatMoney(pMedio)} <span class="metric-trend">—%</span>`;
-            document.getElementById('val-visitas').innerHTML = `${formatNum(tVis)} <span class="metric-trend trend-up"><i class="fa-solid fa-caret-up"></i> ${pctFixo(tVis, 2, 7)}%</span>`;
-            document.getElementById('val-qtd-vendas').innerHTML = `${formatNum(tVen)} <span class="metric-trend trend-up"><i class="fa-solid fa-caret-up"></i> ${pctFixo(tVen, 1, 5)}%</span>`;
-            document.getElementById('val-conversao').innerHTML = `${conv.toFixed(2)}% <span class="metric-trend" style="font-size: 12px;">+0,${pctFixo(conv * 100, 1, 9)} pts</span>`;
-            document.getElementById('val-preco-venda').innerHTML = `${formatMoney(pVenda)} <span class="metric-trend">—%</span>`;
-            document.getElementById('val-canceladas').innerHTML = `${formatNum(tCan)} <span class="metric-trend">—%</span>`;
+            /* Período anterior, para as setinhas compararem algo de verdade. */
+            const ant = periodoAnterior(dataInicio, dataFim, isHoje);
+            const antPMedio = ant.uni > 0 ? ant.fat / ant.uni : 0;
+            const antPVenda = ant.ven > 0 ? ant.fat / ant.ven : 0;
+            const antConv = ant.vis > 0 ? (ant.ven / ant.vis) * 100 : 0;
+
+            document.getElementById('val-vendas').innerHTML = `${formatMoney(tFat)} ${variacao(tFat, ant.fat)}`;
+            document.getElementById('val-unidades').innerHTML = `${formatNum(tUni)} ${variacao(tUni, ant.uni)}`;
+            document.getElementById('val-preco-unidade').innerHTML = `${formatMoney(pMedio)} ${variacao(pMedio, antPMedio)}`;
+            document.getElementById('val-visitas').innerHTML = `${formatNum(tVis)} ${variacao(tVis, ant.vis)}`;
+            document.getElementById('val-qtd-vendas').innerHTML = `${formatNum(tVen)} ${variacao(tVen, ant.ven)}`;
+            document.getElementById('val-conversao').innerHTML = `${conv.toFixed(2)}% ${variacaoPontos(conv, antConv)}`;
+            document.getElementById('val-preco-venda').innerHTML = `${formatMoney(pVenda)} ${variacao(pVenda, antPVenda)}`;
+            /* Cancelamento subindo é ruim: a cor inverte. */
+            document.getElementById('val-canceladas').innerHTML = `${formatNum(tCan)} ${variacao(tCan, ant.can, true)}`;
 
             chartInstance.data.labels = labels;
             chartInstance.data.datasets[0].data = dados;

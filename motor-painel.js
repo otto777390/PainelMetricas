@@ -44,9 +44,13 @@
         CRESC_A: 7,
         CRESC_B: 0.35,
 
-        /* Ajustes pontuais. Entram antes da normalização, então não movem o total. */
-        MULT_DIA_ATUAL: 3,
-        MULT_DIA_ANTERIOR: 0.45,
+        /* Reforço do dia corrente e do anterior. Neutros (1) de propósito.
+           Já valeram 3 e 0,45, de um ajuste pontual feito quando o motor ainda
+           inventava os valores. Como se aplicam a QUALQUER "hoje", passaram a
+           criar uma diferença artificial de ~6,7x entre dois dias seguidos, e a
+           comparação com o período anterior virava +400% todo dia. */
+        MULT_DIA_ATUAL: 1,
+        MULT_DIA_ANTERIOR: 1,
 
         /* Quantos itens do catálogo giram de fato. Os primeiros vendem mais,
            então o ranking de "mais vendidos" fica estável. */
@@ -146,6 +150,53 @@
         return 'DELIVERED';
     }
 
+    /* Reparte os pedidos do dia pelas horas seguindo a curva de tráfego.
+     *
+     * Antes cada pedido sorteava a própria hora de forma independente. Com
+     * poucas vendas por dia isso dava desvios enormes — um dia podia ter 16%
+     * do movimento até as 15h e outro 45%, e a comparação "hoje contra ontem
+     * na mesma hora" virava ruído puro (+410% sem significar nada).
+     *
+     * Agora a quantidade de pedidos por hora é calculada pela curva (método do
+     * maior resto, para fechar a soma exata) e só o minuto dentro da hora é
+     * sorteado. Os dias passam a ter o mesmo formato, com variação pequena —
+     * que é como uma loja de verdade se comporta.
+     */
+    function distribuirHorarios(pedidos, r) {
+        const n = pedidos.length;
+        if (!n) return;
+
+        /* Embaralha para o valor do pedido não ter relação com o horário. */
+        const fila = pedidos.slice();
+        for (let i = fila.length - 1; i > 0; i--) {
+            const j = Math.floor(r() * (i + 1));
+            const t = fila[i]; fila[i] = fila[j]; fila[j] = t;
+        }
+
+        const totalValor = fila.reduce((s, p) => s + p.valor, 0);
+
+        /* Percorre as horas em ordem e vai enchendo cada uma até o FATURAMENTO
+           acumulado alcançar o que a curva pede àquela altura do dia. Comparar
+           com o acumulado (e não com a meta isolada da hora) faz o excesso de
+           uma hora ser descontado na seguinte, então o dia não desanda. */
+        let cumAlvo = 0, cumPosto = 0, i = 0;
+
+        for (let h = 0; h < 24 && i < fila.length; h++) {
+            cumAlvo += (CONFIG.PESO_HORA[h] / PESO_TOTAL) * totalValor;
+            while (i < fila.length && cumPosto < cumAlvo) {
+                fila[i].segundo = h * 3600 + Math.floor(r() * 3600);
+                cumPosto += fila[i].valor;
+                i++;
+            }
+        }
+
+        /* Sobra (arredondamento) fecha o dia na última hora. */
+        while (i < fila.length) {
+            fila[i].segundo = 23 * 3600 + Math.floor(r() * 3600);
+            i++;
+        }
+    }
+
     /* Monta os pedidos do dia usando produtos e preços reais do catálogo.
        O alvo é o faturamento do dia: a quantidade de pedidos é consequência
        dos preços, e não o contrário — é isso que deixa o ticket médio realista
@@ -182,13 +233,6 @@
             /* Último pedido: só entra se não estourar demais o alvo. */
             if (total + valor > alvo && (total + valor - alvo) > valor * 0.5) break;
 
-            const alvoHora = r() * PESO_TOTAL;
-            let accH = 0, hora = 23;
-            for (let h = 0; h < 24; h++) {
-                if (alvoHora <= accH + CONFIG.PESO_HORA[h]) { hora = h; break; }
-                accH += CONFIG.PESO_HORA[h];
-            }
-            const segundo = hora * 3600 + Math.floor(r() * 3600);
             const status = statusPorIdade(diasAtras, r());
 
             reg.pedidos.push({
@@ -205,13 +249,15 @@
                 unidades: quantidade,
                 precoUnit: preco,
                 valor: valor,
-                segundo: segundo,
+                /* O horário é atribuído depois, por distribuirHorarios. */
+                segundo: 0,
                 status: status,
                 statusLabel: STATUS_LABEL[status]
             });
             total += valor;
         }
 
+        distribuirHorarios(reg.pedidos, r);
         reg.pedidos.sort((a, b) => a.segundo - b.segundo);
         /* `vendas` é a visão que o painel do ML consome; um pedido é uma venda. */
         reg.vendas = reg.pedidos;
@@ -252,7 +298,10 @@
         }
 
         /* Visitas recalculadas para a conversão cair numa faixa crível (3,5%–6%). */
-        const taxa = 0.035 + r() * 0.025;
+        /* Faixa estreita de propósito: a conversão de uma loja oscila pouco de
+           um dia para o outro. Faixa larga fazia as visitas variarem muito mais
+           que o faturamento, e a comparação entre dias saía sem sentido. */
+        const taxa = 0.042 + r() * 0.012;
         reg.visCheio = Math.max(reg.venCheio, Math.round(reg.venCheio / taxa));
 
         reg.faturamento = reg.fatCheio; reg.unidades = reg.uniCheio;
