@@ -187,56 +187,6 @@ export async function apagarSessao(env, token) {
     await env.PAINEL.delete('sessao:' + token);
 }
 
-/* ------------------------------------------------- freio de forca bruta */
-
-const MAX_TENTATIVAS = 5;        /* erros seguidos antes de travar */
-const JANELA_MIN = 15;           /* minutos de memoria das tentativas */
-const BLOQUEIO_MIN = 15;         /* minutos de castigo depois de travar */
-
-function chaveTentativa(ip) {
-    return 'tentativas:' + (ip || 'sem-ip');
-}
-
-/** Minutos restantes de bloqueio, ou 0 se estiver liberado. */
-export async function bloqueioRestante(env, ip) {
-    const bruto = await env.PAINEL.get(chaveTentativa(ip));
-    if (!bruto) return 0;
-
-    const reg = JSON.parse(bruto);
-    if (!reg.bloqueadoAte) return 0;
-
-    const faltam = new Date(reg.bloqueadoAte).getTime() - Date.now();
-    return faltam > 0 ? Math.ceil(faltam / 60000) : 0;
-}
-
-/** Conta mais uma senha errada e trava o IP ao passar do limite. */
-export async function registrarFalha(env, ip) {
-    const chave = chaveTentativa(ip);
-    const bruto = await env.PAINEL.get(chave);
-    const agora = Date.now();
-
-    let reg = bruto ? JSON.parse(bruto) : { contagem: 0, desde: agora };
-
-    /* Passou da janela sem errar: a contagem recomeca. */
-    if (agora - reg.desde > JANELA_MIN * 60000) reg = { contagem: 0, desde: agora };
-
-    reg.contagem++;
-    if (reg.contagem >= MAX_TENTATIVAS) {
-        reg.bloqueadoAte = new Date(agora + BLOQUEIO_MIN * 60000).toISOString();
-    }
-
-    await env.PAINEL.put(chave, JSON.stringify(reg), {
-        expirationTtl: (JANELA_MIN + BLOQUEIO_MIN) * 60,
-    });
-
-    return Math.max(0, MAX_TENTATIVAS - reg.contagem);
-}
-
-/** Acertou a senha: zera o historico daquele IP. */
-export async function limparFalhas(env, ip) {
-    await env.PAINEL.delete(chaveTentativa(ip));
-}
-
 /* ---------------------------------------------------------------- resposta */
 
 export function json(dados, extra = {}) {
