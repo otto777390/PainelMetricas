@@ -14,12 +14,17 @@ export const DIAS_SESSAO = 30;
 
 /* ------------------------------------------------------------------- senha */
 
+/* O Workers limita o PBKDF2 a 100.000 iteracoes e lanca excecao acima disso.
+   O Miniflare (wrangler local) NAO aplica esse limite, entao um valor maior
+   passa nos testes da maquina e so quebra em producao, com erro 1101. */
+const ITERACOES = 100000;
+
 /** PBKDF2-SHA256. Guardamos só o hash e o sal — a senha em si nunca é salva. */
 export async function derivarHash(senha, sal) {
     const enc = new TextEncoder();
     const chave = await crypto.subtle.importKey('raw', enc.encode(senha), 'PBKDF2', false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits(
-        { name: 'PBKDF2', salt: enc.encode(sal), iterations: 120000, hash: 'SHA-256' },
+        { name: 'PBKDF2', salt: enc.encode(sal), iterations: ITERACOES, hash: 'SHA-256' },
         chave,
         256,
     );
