@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração - Painel de Vendas</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="acesso.js"></script>
+    <script>PainelAcesso.exigirLogin();</script>
+
+    <style>
+        :root { --ml-yellow: #ffe600; --ml-blue: #3483fa; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; }
+        body { background: #f0f0f0; color: #333; }
+
+        header { background: var(--ml-yellow); height: 48px; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; }
+        .hd-inner { width: 100%; max-width: 900px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
+        .hd-brand { display: flex; align-items: center; gap: 11px; font-size: 17px; font-weight: 600; }
+        .hd-brand img { height: 30px; display: block; }
+        .hd-voltar { font-size: 14px; color: #333; text-decoration: none; display: flex; align-items: center; gap: 7px; }
+        .hd-voltar:hover { text-decoration: underline; }
+
+        main { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
+        h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+        .sub { font-size: 14px; color: #666; margin-bottom: 28px; }
+
+        .cartao { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 24px; overflow: hidden; }
+        .cartao-topo { padding: 18px 24px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .cartao-topo h2 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .cartao-topo h2 i { color: var(--ml-blue); font-size: 15px; }
+        .cartao-corpo { padding: 22px 24px 26px; }
+
+        .campo { margin-bottom: 16px; max-width: 360px; }
+        .campo label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; }
+        .campo input { width: 100%; height: 42px; padding: 0 13px; font-size: 14px; background: #f5f7fb; border: 1px solid transparent; border-radius: 6px; outline: none; }
+        .campo input:focus { border-color: var(--ml-blue); background: #fff; }
+
+        .btn { height: 42px; padding: 0 20px; font-size: 14px; font-weight: 500; border: none; border-radius: 6px; cursor: pointer; background: var(--ml-blue); color: #fff; transition: background .15s; }
+        .btn:hover { background: #2968c8; }
+        .btn:disabled { background: #a9c6f5; cursor: default; }
+        .btn-fraco { background: #fff; color: #333; border: 1px solid #d5d5d5; }
+        .btn-fraco:hover { background: #f5f5f5; }
+        .btn-risco { background: #fff; color: #c1374a; border: 1px solid #f0c2c9; }
+        .btn-risco:hover { background: #fdf2f4; }
+        .btn-pequeno { height: 32px; padding: 0 13px; font-size: 13px; }
+
+        .aviso { padding: 11px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+        .aviso.visivel { display: block; }
+        .aviso.erro { background: #fdecee; color: #c1374a; }
+        .aviso.ok { background: #e9f7ee; color: #1a7f45; }
+        .aviso.atencao { background: #fff7e0; color: #8a6410; }
+
+        .linha-info { display: flex; gap: 10px; font-size: 14px; padding: 7px 0; }
+        .linha-info span:first-child { color: #777; min-width: 150px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 12px; font-weight: 500; color: #888; padding: 0 12px 10px 0; border-bottom: 1px solid #eee; }
+        td { padding: 14px 12px 14px 0; border-bottom: 1px solid #f3f3f3; font-size: 14px; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        .aparelho { display: flex; align-items: center; gap: 11px; }
+        .aparelho i { font-size: 17px; color: #888; width: 18px; text-align: center; }
+        .aparelho b { font-weight: 500; }
+        .aparelho small { display: block; color: #888; font-size: 12px; margin-top: 2px; }
+        .tag-atual { background: #e9f7ee; color: #1a7f45; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 10px; margin-left: 8px; }
+        .vazio-tabela { padding: 26px 0; text-align: center; color: #999; font-size: 14px; }
+
+        .rodape-nota { font-size: 12.5px; color: #999; line-height: 1.6; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="hd-inner">
+            <span class="hd-brand">
+                <img src="favicon.svg" alt="">
+                Administração
+            </span>
+            <a class="hd-voltar" href="index.html"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
+        </div>
+    </header>
+
+    <main>
+        <h1>Administração da conta</h1>
+        <p class="sub" id="sub-conta">Carregando…</p>
+
+        <div class="aviso atencao" id="aviso-local">
+            <b>Modo local.</b> Esta página está aberta fora do site publicado, então não há servidor
+            para consultar. Senha e dispositivos só funcionam de verdade em
+            <a href="https://painelmetricas.pages.dev/admin" style="color:inherit">painelmetricas.pages.dev</a>.
+        </div>
+
+        <!-- ------------------------------------------------------- senha -->
+        <div class="cartao">
+            <div class="cartao-topo">
+                <h2><i class="fa-solid fa-key"></i> Senha de acesso</h2>
+            </div>
+            <div class="cartao-corpo">
+                <div class="aviso" id="aviso-senha"></div>
+
+                <form id="form-senha">
+                    <div class="campo">
+                        <label for="senha-atual">Senha atual</label>
+                        <input type="password" id="senha-atual" autocomplete="current-password" required>
+                    </div>
+                    <div class="campo">
+                        <label for="senha-nova">Nova senha</label>
+                        <input type="password" id="senha-nova" autocomplete="new-password" minlength="8" required>
+                    </div>
+                    <div class="campo">
+                        <label for="senha-conf">Repita a nova senha</label>
+                        <input type="password" id="senha-conf" autocomplete="new-password" minlength="8" required>
+                    </div>
+                    <button type="submit" class="btn" id="btn-senha">Alterar senha</button>
+                </form>
+
+                <p class="rodape-nota">
+                    Mínimo de 8 caracteres. Ao trocar, todos os outros dispositivos são desconectados
+                    e precisarão entrar de novo com a senha nova.
+                </p>
+            </div>
+        </div>
+
+        <!-- ------------------------------------------------ dispositivos -->
+        <div class="cartao">
+            <div class="cartao-topo">
+                <h2><i class="fa-solid fa-laptop"></i> Dispositivos conectados</h2>
+                <button class="btn btn-risco btn-pequeno" id="btn-derrubar-todos">Desconectar os outros</button>
+            </div>
+            <div class="cartao-corpo">
+                <div class="aviso" id="aviso-disp"></div>
+                <div id="area-dispositivos"><p class="vazio-tabela">Carregando…</p></div>
+                <p class="rodape-nota">
+                    Cada entrada no painel abre uma sessão, que expira sozinha em 30 dias sem uso.
+                    Desconectar derruba o acesso daquele aparelho na hora.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const avisoLocal = document.getElementById('aviso-local');
+        const areaDisp = document.getElementById('area-dispositivos');
+
+        function mostrarAviso(id, texto, tipo) {
+            const el = document.getElementById(id);
+            el.textContent = texto;
+            el.className = 'aviso visivel ' + (tipo || 'erro');
+        }
+        function limparAviso(id) {
+            document.getElementById(id).className = 'aviso';
+        }
+
+        function quando(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            const minutos = Math.floor((Date.now() - d.getTime()) / 60000);
+            if (minutos < 1) return 'agora';
+            if (minutos < 60) return minutos + ' min atrás';
+            if (minutos < 1440) return Math.floor(minutos / 60) + 'h atrás';
+            const dias = Math.floor(minutos / 1440);
+            if (dias === 1) return 'ontem';
+            if (dias < 30) return dias + ' dias atrás';
+            return d.toLocaleDateString('pt-BR');
+        }
+
+        /* ------------------------------------------------------- carregar */
+
+        PainelAcesso.verificarSessao().then(function (r) {
+            if (r.indisponivel) {
+                avisoLocal.classList.add('visivel');
+                document.getElementById('sub-conta').textContent = 'Servidor indisponível nesta página.';
+                areaDisp.innerHTML = '<p class="vazio-tabela">Disponível apenas no site publicado.</p>';
+                return;
+            }
+            document.getElementById('sub-conta').textContent = r.email || '';
+            carregarDispositivos();
+        });
+
+        function carregarDispositivos() {
+            PainelAcesso.api('dispositivos').then(function (r) {
+                if (!r.ok) {
+                    areaDisp.innerHTML = '<p class="vazio-tabela">Não foi possível carregar.</p>';
+                    return;
+                }
+                if (!r.dispositivos.length) {
+                    areaDisp.innerHTML = '<p class="vazio-tabela">Nenhum dispositivo conectado.</p>';
+                    return;
+                }
+
+                const linhas = r.dispositivos.map(function (d) {
+                    const icone = d.tipo === 'Celular' ? 'fa-mobile-screen' : 'fa-display';
+                    const local = [d.ip, d.pais].filter(Boolean).join(' · ') || '—';
+                    return '<tr>'
+                        + '<td><div class="aparelho"><i class="fa-solid ' + icone + '"></i><div>'
+                        + '<b>' + d.navegador + ' · ' + d.sistema + '</b>'
+                        + (d.atual ? '<span class="tag-atual">este dispositivo</span>' : '')
+                        + '<small>' + local + '</small>'
+                        + '</div></div></td>'
+                        + '<td>' + quando(d.criadaEm) + '</td>'
+                        + '<td>' + quando(d.ultimoAcesso) + '</td>'
+                        + '<td style="text-align:right">'
+                        + (d.atual
+                            ? '<span style="color:#aaa;font-size:13px">—</span>'
+                            : '<button class="btn btn-risco btn-pequeno" data-token="' + d.token + '">Desconectar</button>')
+                        + '</td></tr>';
+                }).join('');
+
+                areaDisp.innerHTML = '<table><thead><tr>'
+                    + '<th>Aparelho</th><th>Entrou</th><th>Último acesso</th><th></th>'
+                    + '</tr></thead><tbody>' + linhas + '</tbody></table>';
+
+                areaDisp.querySelectorAll('button[data-token]').forEach(function (b) {
+                    b.addEventListener('click', function () { desconectar(b.getAttribute('data-token'), b); });
+                });
+            });
+        }
+
+        /* --------------------------------------------------- desconectar */
+
+        function desconectar(token, botao) {
+            botao.disabled = true;
+            botao.textContent = 'Desconectando…';
+            PainelAcesso.api('dispositivos', { method: 'POST', body: JSON.stringify({ token: token }) })
+                .then(function (r) {
+                    if (!r.ok) {
+                        mostrarAviso('aviso-disp', r.mensagem || 'Não foi possível desconectar.', 'erro');
+                        botao.disabled = false;
+                        botao.textContent = 'Desconectar';
+                        return;
+                    }
+                    mostrarAviso('aviso-disp', 'Dispositivo desconectado.', 'ok');
+                    carregarDispositivos();
+                });
+        }
+
+        document.getElementById('btn-derrubar-todos').addEventListener('click', function () {
+            if (!confirm('Desconectar todos os outros dispositivos? Este continua conectado.')) return;
+            const b = this;
+            b.disabled = true;
+            PainelAcesso.api('dispositivos', { method: 'POST', body: JSON.stringify({ todosOsOutros: true }) })
+                .then(function (r) {
+                    b.disabled = false;
+                    if (!r.ok) { mostrarAviso('aviso-disp', 'Não foi possível desconectar.', 'erro'); return; }
+                    mostrarAviso('aviso-disp', r.encerradas + ' dispositivo(s) desconectado(s).', 'ok');
+                    carregarDispositivos();
+                });
+        });
+
+        /* ---------------------------------------------------------- senha */
+
+        document.getElementById('form-senha').addEventListener('submit', function (e) {
+            e.preventDefault();
+            limparAviso('aviso-senha');
+
+            const atual = document.getElementById('senha-atual').value;
+            const nova = document.getElementById('senha-nova').value;
+            const conf = document.getElementById('senha-conf').value;
+
+            if (nova !== conf) { mostrarAviso('aviso-senha', 'A confirmação não bate com a nova senha.', 'erro'); return; }
+            if (nova.length < 8) { mostrarAviso('aviso-senha', 'A nova senha precisa de pelo menos 8 caracteres.', 'erro'); return; }
+
+            const botao = document.getElementById('btn-senha');
+            botao.disabled = true;
+            botao.textContent = 'Alterando…';
+
+            PainelAcesso.api('senha', { method: 'POST', body: JSON.stringify({ senhaAtual: atual, senhaNova: nova }) })
+                .then(function (r) {
+                    botao.disabled = false;
+                    botao.textContent = 'Alterar senha';
+                    if (!r.ok) { mostrarAviso('aviso-senha', r.mensagem || 'Não foi possível alterar a senha.', 'erro'); return; }
+
+                    document.getElementById('form-senha').reset();
+                    mostrarAviso('aviso-senha',
+                        'Senha alterada.' + (r.sessoesEncerradas ? ' ' + r.sessoesEncerradas + ' dispositivo(s) desconectado(s).' : ''),
+                        'ok');
+                    carregarDispositivos();
+                });
+        });
+    </script>
+</body>
+</html>

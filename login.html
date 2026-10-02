@@ -173,18 +173,18 @@
             botao.disabled = true;
             botao.textContent = 'Entrando...';
 
-            /* Pequena espera só para o clique não parecer travado. */
-            setTimeout(function () {
-                if (PainelAcesso.entrar(email, senha)) {
+            /* A validação acontece no servidor; aqui só esperamos a resposta. */
+            PainelAcesso.entrar(email, senha).then(function (r) {
+                if (r.ok) {
                     location.replace('index.html');
                     return;
                 }
                 botao.disabled = false;
                 botao.textContent = 'Entrar';
-                mostrarErro('E-mail ou senha incorretos.');
+                mostrarErro(r.mensagem || 'E-mail ou senha incorretos.');
                 campoSenha.value = '';
                 campoSenha.focus();
-            }, 350);
+            });
         });
 
         campoEmail.focus();
