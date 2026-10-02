@@ -21,7 +21,6 @@
     /* ---------------------------------------------------------- modo local */
 
     const CHAVE_LOCAL = 'painel-sessao';
-    const LOCAL = { email: 'metricasml2026@gmail.com', senha: 'painelmetricas2026' };
 
     const ehLocal = location.protocol === 'file:'
         || ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) !== -1;
@@ -66,11 +65,14 @@
             return { ok: false, mensagem: r.mensagem || 'E-mail ou senha incorretos.' };
 
         } catch (e) {
-            /* Sem API: só o modo local resolve. */
+            /* Sem API (file:// ou localhost sem as Functions): libera, para dar
+               para desenvolver na máquina. NÃO há senha guardada aqui — este
+               arquivo é público no GitHub, e a senha de verdade mora só no
+               servidor, como hash. Localmente os dados são simulados: não há
+               nada a proteger. */
             if (ehLocal) {
-                const certo = email.trim().toLowerCase() === LOCAL.email && senha === LOCAL.senha;
-                if (certo) { try { localStorage.setItem(CHAVE_LOCAL, 'ok'); } catch (e2) {} return { ok: true }; }
-                return { ok: false, mensagem: 'E-mail ou senha incorretos.' };
+                try { localStorage.setItem(CHAVE_LOCAL, 'ok'); } catch (e2) {}
+                return { ok: true, local: true };
             }
             return { ok: false, mensagem: 'Não foi possível falar com o servidor. Tente de novo.' };
         }

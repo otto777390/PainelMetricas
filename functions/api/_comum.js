@@ -47,13 +47,25 @@ export function iguais(a, b) {
 
 /* ------------------------------------------------------------------- conta */
 
-/** Lê a conta do KV; na primeira vez, cria a partir das variáveis de ambiente. */
+/**
+ * Lê a conta do KV. Se ainda não existir, cria a partir de ADMIN_EMAIL e
+ * ADMIN_SENHA (variáveis de ambiente do Cloudflare).
+ *
+ * Sem ADMIN_SENHA definida, NÃO criamos conta: antes havia uma senha padrão
+ * escrita aqui, e este repositório é público — qualquer um que apagasse o KV
+ * recriaria a conta com uma senha conhecida. Melhor falhar e avisar.
+ */
 export async function lerConta(env) {
     const bruto = await env.PAINEL.get('conta');
     if (bruto) return JSON.parse(bruto);
 
-    const email = (env.ADMIN_EMAIL || 'metricasml2026@gmail.com').trim().toLowerCase();
-    const senha = env.ADMIN_SENHA || 'painelmetricas2026';
+    const email = (env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const senha = env.ADMIN_SENHA || '';
+    if (!email || !senha) {
+        const erro = new Error('conta-nao-configurada');
+        erro.semConta = true;
+        throw erro;
+    }
     const sal = aleatorio(16);
 
     const conta = {

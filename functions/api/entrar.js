@@ -29,7 +29,20 @@ export async function onRequestPost({ request, env }) {
     const senha = String(corpo.senha || '');
     if (!email || !senha) return json({ ok: false, erro: 'faltam-campos' }, { status: 400 });
 
-    const conta = await lerConta(env);
+    let conta;
+    try {
+        conta = await lerConta(env);
+    } catch (e) {
+        if (e && e.semConta) {
+            return json({
+                ok: false,
+                erro: 'sem-conta',
+                mensagem: 'Nenhuma conta configurada. Defina ADMIN_EMAIL e ADMIN_SENHA nas variáveis do projeto no Cloudflare.',
+            }, { status: 503 });
+        }
+        throw e;
+    }
+
     const hash = await derivarHash(senha, conta.sal);
 
     /* Mensagem única para e-mail e senha: não entregamos qual dos dois errou. */

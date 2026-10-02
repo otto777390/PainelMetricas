@@ -8,6 +8,10 @@ export async function onRequestGet({ request, env }) {
     const sessao = await sessaoAtual(env, request);
     if (!sessao) return json({ ok: false, autenticado: false }, { status: 401 });
 
-    const conta = await lerConta(env);
-    return json({ ok: true, autenticado: true, email: conta.email, desde: sessao.criadaEm });
+    /* A sessão já prova o acesso; o e-mail é só para exibir. Se a conta sumiu
+       do KV, não derruba a resposta por causa de um rótulo. */
+    let email = '';
+    try { email = (await lerConta(env)).email; } catch (e) { /* segue sem o rótulo */ }
+
+    return json({ ok: true, autenticado: true, email: email, desde: sessao.criadaEm });
 }
