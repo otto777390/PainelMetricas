@@ -77,7 +77,10 @@
                 <img src="favicon.svg" alt="">
                 Administração
             </span>
-            <a class="hd-voltar" href="index.html"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
+            <span style="display:flex;align-items:center;gap:18px">
+                <button id="btn-trancar" style="background:none;border:none;cursor:pointer;font-size:14px;color:#333;display:flex;align-items:center;gap:7px;font-family:inherit" title="Fechar a area de administracao sem sair da conta"><i class="fa-solid fa-lock"></i> Trancar</button>
+                <a class="hd-voltar" href="index.html"><i class="fa-solid fa-arrow-left"></i> Voltar ao painel</a>
+            </span>
         </div>
     </header>
 
@@ -279,5 +282,13 @@
                 });
         });
     </script>
+        /* Tranca a area de administracao sem encerrar a sessao da conta. */
+        document.getElementById('btn-trancar').addEventListener('click', function () {
+            PainelAcesso.api('admin-acesso', { method: 'DELETE' }).then(function () {
+                location.replace('index.html');
+            });
+        });
+    </script>
+    <script src="olho.js"></script>
 </body>
 </html>
