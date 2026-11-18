@@ -57,11 +57,21 @@
         PRODUTOS_ATIVOS: 12,
 
         /* Fechamento fixo do dia corrente. Com valor, o dia termina exatamente
-           nele em vez do sorteio do motor; `null` devolve o sorteio.
+           nele; `null` usa a faixa abaixo.
 
            Fica aqui, no motor, e nao em cada projeto: os dois sites leem o mesmo
-           dia, entao um alvo aplicado so de um lado desincronizaria os numeros. */
-        META_HOJE: 2593.77,
+           dia, entao um alvo aplicado so de um lado desincronizaria os numeros.
+           Valeu 2593.77 ate 18/11/2026 — todo dia fechava igual, e o Otavio
+           pediu algo mais vivo para testar. */
+        META_HOJE: null,
+
+        /* Faixa do fechamento de cada dia depois de DATA_REF: sorteado por
+           data (sempre o mesmo valor para o mesmo dia, nos dois sites e em
+           qualquer recarga), de R$ 1.000 a R$ 7.000. Vale tambem para os dias
+           ja passados, para "ontem" continuar valendo o que fechou — antes o
+           dia trocava de valor na virada da meia-noite. */
+        META_DIA_MIN: 1000,
+        META_DIA_MAX: 7000,
 
         /* Peso de vendas por hora: madrugada parada, tarde e noite fortes. */
         PESO_HORA: [1.0, 0.6, 0.4, 0.3, 0.3, 0.5, 1.0, 2.0, 3.5, 4.5, 5.5, 6.0,
@@ -134,6 +144,16 @@
             h = Math.imul(h, 16777619);
         }
         return h >>> 0;
+    }
+
+    /* Fechamento sorteado de um dia (ver META_DIA_MIN/MAX). Semente pela data,
+       nao pela ordem do laco: o valor de um dia nao muda quando o historico
+       ganha mais um dia no fim. */
+    function metaDoDia(data) {
+        const r = mulberry32(hashTexto('meta-' + data.getFullYear() + '-' + (data.getMonth() + 1) + '-' + data.getDate()));
+        r(); // a primeira saida do mulberry32 varia pouco com sementes proximas
+        const valor = CONFIG.META_DIA_MIN + r() * (CONFIG.META_DIA_MAX - CONFIG.META_DIA_MIN);
+        return Math.round(valor * 100) / 100;
     }
 
     /* Status conforme a idade do pedido: o de hoje ainda está para pagar ou
@@ -463,11 +483,16 @@
            os dois últimos dias ganham vendas sintéticas (modo antigo). */
         if (catalogo && catalogo.length) {
             const ultimo = dias.length - 1;
-            /* O dia corrente entra com o fechamento combinado; os passados
-               mantem o sorteio, que e o que segura 7d/30d/12m estaveis. */
-            if (CONFIG.META_HOJE != null) dias[ultimo].fatCheio = CONFIG.META_HOJE;
-            dias.forEach((d, i) => gerarPedidosDoDia(
-                d, catalogo, ultimo - i, i === ultimo ? CONFIG.META_HOJE : null));
+            const refMs = semHora(dataRef).getTime();
+            /* Dias depois de DATA_REF fecham no valor sorteado da data; os de
+               antes seguem a curva normalizada (o historico de crescimento). */
+            dias.forEach((d, i) => {
+                let meta = null;
+                if (i === ultimo && CONFIG.META_HOJE != null) meta = CONFIG.META_HOJE;
+                else if (CONFIG.META_DIA_MIN != null && semHora(d.dataObj).getTime() > refMs) meta = metaDoDia(d.dataObj);
+                if (meta != null) d.fatCheio = meta;
+                gerarPedidosDoDia(d, catalogo, ultimo - i, meta);
+            });
         } else {
             gerarVendasDoDia(dias[dias.length - 1]);
             if (dias.length > 1) gerarVendasDoDia(dias[dias.length - 2]);
@@ -537,6 +562,7 @@
         gerarHistorico: gerarHistorico,
         gerarVendasDoDia: gerarVendasDoDia,
         gerarPedidosDoDia: gerarPedidosDoDia,
+        metaDoDia: metaDoDia,
         precoDeVenda: precoDeVenda,
         STATUS_LABEL: STATUS_LABEL,
         aplicarProgresso: aplicarProgresso,
