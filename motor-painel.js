@@ -65,13 +65,22 @@
            pediu algo mais vivo para testar. */
         META_HOJE: null,
 
-        /* Faixa do fechamento de cada dia depois de DATA_REF: sorteado por
-           data (sempre o mesmo valor para o mesmo dia, nos dois sites e em
-           qualquer recarga), de R$ 1.000 a R$ 7.000. Vale tambem para os dias
-           ja passados, para "ontem" continuar valendo o que fechou — antes o
-           dia trocava de valor na virada da meia-noite. */
+        /* Fechamento de cada dia depois de DATA_REF, sorteado por data (sempre
+           o mesmo valor para o mesmo dia, nos dois sites e em qualquer recarga).
+           Vale tambem para os dias ja passados, para "ontem" continuar valendo
+           o que fechou — antes o dia trocava de valor na virada da meia-noite.
+
+           Tres tipos de dia, como uma loja de verdade (pedido do Otavio,
+           18/11/2026: "a maioria dias fracos, um dia ou outro estourando 7 mil"):
+           cada um e uma log-normal (mediana, espalhamento) — assimetrica, com
+           cauda para cima, que e como faturamento diario se distribui.
+           Piso: nenhum dia abaixo de META_DIA_MIN. */
         META_DIA_MIN: 1000,
-        META_DIA_MAX: 7000,
+        META_TIPOS_DE_DIA: [
+            { chance: 0.82, mediana: 2000, espalhamento: 0.32 }, // normal
+            { chance: 0.15, mediana: 4300, espalhamento: 0.20 }, // bom
+            { chance: 0.03, mediana: 7400, espalhamento: 0.10 }  // excepcional
+        ],
 
         /* Peso de vendas por hora: madrugada parada, tarde e noite fortes. */
         PESO_HORA: [1.0, 0.6, 0.4, 0.3, 0.3, 0.5, 1.0, 2.0, 3.5, 4.5, 5.5, 6.0,
@@ -152,7 +161,22 @@
     function metaDoDia(data) {
         const r = mulberry32(hashTexto('meta-' + data.getFullYear() + '-' + (data.getMonth() + 1) + '-' + data.getDate()));
         r(); // a primeira saida do mulberry32 varia pouco com sementes proximas
-        const valor = CONFIG.META_DIA_MIN + r() * (CONFIG.META_DIA_MAX - CONFIG.META_DIA_MIN);
+
+        /* Qual tipo de dia. */
+        let sorteio = r(), tipo = CONFIG.META_TIPOS_DE_DIA[0];
+        for (let i = 0; i < CONFIG.META_TIPOS_DE_DIA.length; i++) {
+            tipo = CONFIG.META_TIPOS_DE_DIA[i];
+            if (sorteio < tipo.chance) break;
+            sorteio -= tipo.chance;
+        }
+
+        /* Normal padrao por Box-Muller (1 - r() evita log(0)), virada em
+           log-normal em torno da mediana do tipo. */
+        const z = Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+        let valor = tipo.mediana * Math.exp(tipo.espalhamento * z);
+
+        /* Piso: abaixo do minimo, cai logo acima dele (nao amontoa no 1000 exato). */
+        if (valor < CONFIG.META_DIA_MIN) valor = CONFIG.META_DIA_MIN + r() * 400;
         return Math.round(valor * 100) / 100;
     }
 
