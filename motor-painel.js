@@ -569,6 +569,92 @@
         return t;
     }
 
+    // -------------------------------------------------------- vendas manuais
+
+    /* Vendas lancadas a mao na aba Vendas do Admin da DropFly (pedido do
+       Otavio, 21/11/2026). Ficam no banco da DropFly; os dois sites as recebem
+       prontas e encaixam aqui, com a MESMA regra — por isso a funcao mora no
+       motor e nao em cada projeto.
+
+       Idempotente: tira as manuais aplicadas antes e poe a lista nova. A
+       replica chama de novo a cada poucos segundos sem recarregar a pagina.
+
+       Cada venda: { id, dia: 'AAAA-MM-DD', segundo, numero, produtoId,
+       titulo, quantidade, precoUnit, valor }. */
+    function chaveDoDia(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    /* Status pela idade, como os pedidos do motor — so que nunca cancelado nem
+       aguardando pagamento: quem lanca a venda quer ve-la valendo. */
+    function statusDaManual(diasAtras, numero) {
+        const u = (hashTexto('manual-' + numero) % 10000) / 10000;
+        return statusPorIdade(diasAtras, 0.11 + u * 0.89);
+    }
+
+    /* Refaz o fechamento do dia pelos pedidos. As visitas acompanham as vendas
+       na mesma proporcao de antes, senao a conversao do dia dispararia. */
+    function fecharDia(reg) {
+        if (reg._visBase == null) { reg._visBase = reg.visCheio; reg._venBase = reg.venCheio; }
+        const pedidos = reg.pedidos || [];
+        reg.fatCheio = Math.round(pedidos.reduce((s, p) => p.status === 'CANCELLED' ? s : s + p.valor, 0) * 100) / 100;
+        reg.venCheio = pedidos.length;
+        reg.uniCheio = pedidos.reduce((s, p) => s + p.quantidade, 0);
+        reg.canCheio = pedidos.filter(p => p.status === 'CANCELLED').length;
+        reg.visCheio = reg._venBase > 0
+            ? Math.max(reg.venCheio, Math.round(reg._visBase * reg.venCheio / reg._venBase))
+            : Math.max(reg.venCheio, Math.round(reg.venCheio / 0.048));
+        reg.faturamento = reg.fatCheio; reg.unidades = reg.uniCheio;
+        reg.visitas = reg.visCheio; reg.qtdVendas = reg.venCheio; reg.canceladas = reg.canCheio;
+    }
+
+    function aplicarVendasManuais(serie, vendas, catalogo) {
+        if (!serie || !serie.dias) return serie;
+        const porDia = {};
+        (vendas || []).forEach(v => { if (v && v.dia) (porDia[v.dia] = porDia[v.dia] || []).push(v); });
+        const produtos = {};
+        (catalogo || []).forEach(p => { produtos[p.id] = p; });
+
+        const ultimo = serie.dias.length - 1;
+        let mexeu = false;
+        serie.dias.forEach((d, i) => {
+            const tinha = (d.pedidos || []).some(p => p.manual);
+            const lista = porDia[chaveDoDia(d.dataObj)];
+            if (!tinha && !lista) return;
+            mexeu = true;
+            d.pedidos = (d.pedidos || []).filter(p => !p.manual);
+            (lista || []).forEach(v => {
+                const p = produtos[v.produtoId] || {};
+                const status = statusDaManual(ultimo - i, v.numero);
+                d.pedidos.push({
+                    manual: true,
+                    idManual: v.id,
+                    numero: v.numero,
+                    produtoId: v.produtoId,
+                    titulo: p.nome || v.titulo || '',
+                    sku: p.sku || '',
+                    imagem: p.imagem || '',
+                    estoque: p.estoque || 0,
+                    quantidade: v.quantidade,
+                    unidades: v.quantidade,
+                    precoUnit: v.precoUnit,
+                    valor: v.valor,
+                    segundo: v.segundo,
+                    status: status,
+                    statusLabel: STATUS_LABEL[status]
+                });
+            });
+            d.pedidos.sort((a, b) => a.segundo - b.segundo);
+            d.vendas = d.pedidos;
+            fecharDia(d);
+        });
+
+        if (mexeu && serie.pedidos) {
+            serie.pedidos = serie.dias.reduce((acc, d) => acc.concat((d.pedidos || []).map(p => Object.assign({ dia: d.dataObj }, p))), []);
+        }
+        return serie;
+    }
+
     const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     const MESES_LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                           'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -592,6 +678,8 @@
         aplicarProgresso: aplicarProgresso,
         vendasPorHora: vendasPorHora,
         acumuladoPorHora: acumuladoPorHora,
-        totalizar: totalizar
+        totalizar: totalizar,
+        chaveDoDia: chaveDoDia,
+        aplicarVendasManuais: aplicarVendasManuais
     };
 });

@@ -31,3 +31,30 @@ function aplicarProgressoHoje(agora) {
 }
 
 aplicarProgressoHoje(new Date());
+
+/* Vendas lançadas à mão na aba Vendas do Admin da DropFly (21/11/2026).
+   Moram no banco da DropFly; aqui só são buscadas e encaixadas pelo motor,
+   com a mesma regra que a DropFly usa — por isso os dois painéis batem.
+
+   Busca de novo a cada 20 s sem recarregar: as páginas já redesenham sozinhas
+   (Métricas a cada 5 s, Ao vivo a cada 1 s) lendo os mesmos objetos do dia.
+   Sem rede, ou com a DropFly fora, o painel segue só com o motor. */
+(function () {
+    const URL_MANUAIS = 'https://www.dropfly.site/api/painel/vendas-manuais';
+    let versao = null;
+
+    function buscar() {
+        fetch(URL_MANUAIS, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (dados) {
+                if (!dados || !Array.isArray(dados.vendas) || dados.versao === versao) return;
+                versao = dados.versao;
+                MotorPainel.aplicarVendasManuais(_serie, dados.vendas, catalogoPainel);
+                aplicarProgressoHoje(new Date());
+            })
+            .catch(function () { /* fica com o que tinha */ });
+    }
+
+    buscar();
+    setInterval(buscar, 20000);
+})();
